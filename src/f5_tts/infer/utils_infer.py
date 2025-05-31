@@ -22,7 +22,7 @@ import tqdm
 from pydub import AudioSegment, silence
 from transformers import pipeline
 from vocos import Vocos
-
+import soundfile as sf
 from f5_tts.model import CFM
 from f5_tts.model.utils import (
     get_tokenizer,
@@ -414,33 +414,34 @@ def infer_batch_process(
             ref_text_len = len(ref_text.encode("utf-8"))
             gen_text_len = len(gen_text.encode("utf-8"))
             duration = ref_audio_len + int(ref_audio_len / ref_text_len * gen_text_len / speed)
+        for j in range(3):
+            # inference
+            with torch.inference_mode():
+                generated, _ = model_obj.sample(
+                    cond=audio,
+                    text=final_text_list,
+                    duration=duration,
+                    steps=nfe_step,
+                    cfg_strength=cfg_strength,
+                    sway_sampling_coef=sway_sampling_coef,
+                )
 
-        # inference
-        with torch.inference_mode():
-            generated, _ = model_obj.sample(
-                cond=audio,
-                text=final_text_list,
-                duration=duration,
-                steps=nfe_step,
-                cfg_strength=cfg_strength,
-                sway_sampling_coef=sway_sampling_coef,
-            )
+                generated = generated.to(torch.float32)
+                generated = generated[:, ref_audio_len:, :]
+                generated_mel_spec = generated.permute(0, 2, 1)
+                if mel_spec_type == "vocos":
+                    generated_wave = vocoder.decode(generated_mel_spec)
+                elif mel_spec_type == "bigvgan":
+                    generated_wave = vocoder(generated_mel_spec)
+                if rms < target_rms:
+                    generated_wave = generated_wave * rms / target_rms
 
-            generated = generated.to(torch.float32)
-            generated = generated[:, ref_audio_len:, :]
-            generated_mel_spec = generated.permute(0, 2, 1)
-            if mel_spec_type == "vocos":
-                generated_wave = vocoder.decode(generated_mel_spec)
-            elif mel_spec_type == "bigvgan":
-                generated_wave = vocoder(generated_mel_spec)
-            if rms < target_rms:
-                generated_wave = generated_wave * rms / target_rms
-
-            # wav -> numpy
-            generated_wave = generated_wave.squeeze().cpu().numpy()
-
-            generated_waves.append(generated_wave)
-            spectrograms.append(generated_mel_spec[0].cpu().numpy())
+                # wav -> numpy
+                generated_wave = generated_wave.squeeze().cpu().numpy()
+                if j==0:
+                    generated_waves.append(generated_wave)
+                spectrograms.append(generated_mel_spec[0].cpu().numpy())
+                sf.write(f'{"./ff5tts/temp/"}{i:04d}.{j}.wav', generated_wave,target_sample_rate)
 
     # Combine all generated waves with cross-fading
     if cross_fade_duration <= 0:
