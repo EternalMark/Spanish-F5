@@ -28,6 +28,8 @@ from f5_tts.model.utils import (
     get_tokenizer,
     convert_char_to_pinyin,
 )
+from num2words import num2words
+
 
 _ref_audio_cache = {}
 
@@ -336,6 +338,10 @@ def infer_process(
     speed=speed,
     fix_duration=fix_duration,
     device=device,
+    decimalinicial=0,
+    intentos=3,
+    incremental=10,
+    inicial=40
 ):
     # Split the input text into batches
     audio, sr = torchaudio.load(ref_audio)
@@ -367,13 +373,18 @@ def infer_process(
         speed=speed,
         fix_duration=fix_duration,
         device=device,
+        decimalinicial=decimalinicial,
+        intentos=intentos,
+        incremental=incremental,
+        inicial=inicial
     )
 
 
 def traducir_numero_a_texto(texto):
+    
     texto_separado = re.sub(r'([A-Za-z])(\d)', r'\1 \2', texto)
     texto_separado = re.sub(r'(\d)([A-Za-z])', r'\1 \2', texto_separado)
-    
+    texto_separado=texto_separado.lower()
     def reemplazar_numero(match):
         numero = match.group()
         return num2words(int(numero), lang='es')
@@ -427,7 +438,7 @@ def infer_batch_process(
     
     i=inicial
     for gen_text in enumerate(progress.tqdm(gen_text_batches)):
-        gen_text = gen_text.lower()
+        
         gen_text = traducir_numero_a_texto(gen_text)
         # Prepare the text
         text_list = [ref_text + gen_text]

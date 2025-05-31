@@ -88,7 +88,12 @@ def generate_response(messages, model, tokenizer):
 
 @gpu_decorator
 def infer(
-    ref_audio_orig, ref_text, gen_text, model, remove_silence, cross_fade_duration=0.15, speed=1, show_info=gr.Info
+    ref_audio_orig, ref_text, gen_text, model, remove_silence, cross_fade_duration=0.15, speed=1, show_info=gr.Info,
+    decimalinicial=0,
+    intentos=3,
+    incremental=10,
+    inicial=40
+
 ):
     ref_audio, ref_text = preprocess_ref_audio_text(ref_audio_orig, ref_text, show_info=show_info)
 
@@ -112,6 +117,10 @@ def infer(
         speed=speed,
         show_info=show_info,
         progress=gr.Progress(),
+        decimalinicial=decimalinicial,
+        intentos=intentos,
+        incremental=incremental,
+        inicial=inicial
     )
 
     # Remove silence
@@ -144,6 +153,38 @@ with gr.Blocks() as app_tts:
     gr.Markdown("# TTS por Lotes POR MARCOS **********")
     ref_audio_input = gr.Audio(label="Audio de Referencia", type="filepath")
     gen_text_input = gr.Textbox(label="Texto para Generar", lines=10)
+    inicial = gr.Slider(
+        label="inicial",
+        minimum=0,
+        maximum=9,
+        value=0,
+        step=1,
+        info="Nombre inicial.",
+    )
+    decimalinicial = gr.Slider(
+        label="decimalinicial",
+        minimum=0,
+        maximum=990,
+        value=40,
+        step=10,
+        info="Decimal inicial del nombre.",
+    )
+    intentos = gr.Slider(
+        label="intentos",
+        minimum=1,
+        maximum=9,
+        value=3,
+        step=1,
+        info="Intentos para cada audio o número de decimales",
+    )
+    incremental = gr.Slider(
+        label="incremental",
+        minimum=1,
+        maximum=10,
+        value=1,
+        step=10,
+        info="Incremental para el nombre del audio.",
+    )
     model_choice = gr.Radio(choices=["F5-TTS"], label="Seleccionar Modelo TTS", value="F5-TTS")
     generate_btn = gr.Button("Sintetizar", variant="primary")
     with gr.Accordion("Configuraciones Avanzadas", open=False):
@@ -187,6 +228,10 @@ with gr.Blocks() as app_tts:
             remove_silence,
             cross_fade_duration_slider,
             speed_slider,
+            decimalinicial,
+            intentos,
+            incremental,
+            inicial
         ],
         outputs=[audio_output, spectrogram_output],
     )
