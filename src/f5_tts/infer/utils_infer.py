@@ -352,7 +352,7 @@ def infer_process(
     with open("./ff5tts/temp/sentences.txt", "w") as f:
         for i, gen_text in enumerate(gen_text_batches):
             print(f"'{gen_text}")
-            f.write(f"'{gen_text}")
+            f.write(f"'{gen_text}\n")
     print(f"*********************")
     print("File created successfully")
 

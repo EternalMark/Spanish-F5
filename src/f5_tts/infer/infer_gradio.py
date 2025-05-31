@@ -156,17 +156,25 @@ with gr.Blocks() as app_tts:
     inicial = gr.Slider(
         label="inicial",
         minimum=0,
-        maximum=9,
-        value=0,
-        step=1,
+        maximum=990,
+        value=40,
+        step=10,
         info="Nombre inicial.",
+    )
+    incremental = gr.Slider(
+        label="incremental",
+        minimum=1,
+        maximum=10,
+        value=1,
+        step=10,
+        info="Incremental para el nombre del audio.",
     )
     decimalinicial = gr.Slider(
         label="decimalinicial",
         minimum=0,
-        maximum=990,
-        value=40,
-        step=10,
+        maximum=9,
+        value=0,
+        step=1,
         info="Decimal inicial del nombre.",
     )
     intentos = gr.Slider(
@@ -176,14 +184,6 @@ with gr.Blocks() as app_tts:
         value=3,
         step=1,
         info="Intentos para cada audio o número de decimales",
-    )
-    incremental = gr.Slider(
-        label="incremental",
-        minimum=1,
-        maximum=10,
-        value=1,
-        step=10,
-        info="Incremental para el nombre del audio.",
     )
     model_choice = gr.Radio(choices=["F5-TTS"], label="Seleccionar Modelo TTS", value="F5-TTS")
     generate_btn = gr.Button("Sintetizar", variant="primary")
@@ -228,10 +228,10 @@ with gr.Blocks() as app_tts:
             remove_silence,
             cross_fade_duration_slider,
             speed_slider,
-            decimalinicial,
-            intentos,
-            incremental,
-            inicial
+            int(decimalinicial),
+            int(intentos),
+            int(incremental),
+            int(inicial)
         ],
         outputs=[audio_output, spectrogram_output],
     )
