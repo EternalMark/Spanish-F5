@@ -165,7 +165,7 @@ with gr.Blocks() as app_tts:
         label="incremental",
         minimum=1,
         maximum=10,
-        value=1,
+        value=10,
         step=1,
         info="Incremental para el nombre del audio.",
     )

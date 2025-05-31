@@ -437,7 +437,7 @@ def infer_batch_process(
         ref_text = ref_text + " "
     
     i=inicial
-    for gen_text in enumerate(progress.tqdm(gen_text_batches)):
+    for gen_text in progress.tqdm(gen_text_batches):
         
         gen_text = traducir_numero_a_texto(gen_text)
         # Prepare the text
