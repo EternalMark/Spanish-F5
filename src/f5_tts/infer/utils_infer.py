@@ -340,9 +340,15 @@ def infer_process(
     # Split the input text into batches
     audio, sr = torchaudio.load(ref_audio)
     max_chars = int(len(ref_text.encode("utf-8")) / (audio.shape[-1] / sr) * (25 - audio.shape[-1] / sr))
-    gen_text_batches = chunk_text(gen_text, max_chars=max_chars)
-    for i, gen_text in enumerate(gen_text_batches):
-        print(f"gen_text {i}", gen_text)
+    # gen_text_batches = chunk_text(gen_text, max_chars=max_chars)
+    gen_text_batches = chunk_text(gen_text, max_chars=80)
+    print(f"*********************")
+    with open("./ff5tts/temp/sentences.txt", "w") as f:
+        for i, gen_text in enumerate(gen_text_batches):
+            print(f"'{gen_text}")
+            f.write(f"'{gen_text}")
+    print(f"*********************")
+    print("File created successfully")
 
     show_info(f"Generating audio in {len(gen_text_batches)} batches...")
     return infer_batch_process(
@@ -364,6 +370,19 @@ def infer_process(
     )
 
 
+def traducir_numero_a_texto(texto):
+    texto_separado = re.sub(r'([A-Za-z])(\d)', r'\1 \2', texto)
+    texto_separado = re.sub(r'(\d)([A-Za-z])', r'\1 \2', texto_separado)
+    
+    def reemplazar_numero(match):
+        numero = match.group()
+        return num2words(int(numero), lang='es')
+
+    texto_traducido = re.sub(r'\b\d+\b', reemplazar_numero, texto_separado)
+
+    return texto_traducido
+
+
 # infer batches
 
 
@@ -383,6 +402,10 @@ def infer_batch_process(
     speed=1,
     fix_duration=None,
     device=None,
+    decimalinicial=0,
+    intentos=3,
+    incremental=10,
+    inicial=40
 ):
     audio, sr = ref_audio
     if audio.shape[0] > 1:
@@ -401,7 +424,11 @@ def infer_batch_process(
 
     if len(ref_text[-1].encode("utf-8")) == 1:
         ref_text = ref_text + " "
-    for i, gen_text in enumerate(progress.tqdm(gen_text_batches)):
+    
+    i=inicial
+    for gen_text in enumerate(progress.tqdm(gen_text_batches)):
+        gen_text = gen_text.lower()
+        gen_text = traducir_numero_a_texto(gen_text)
         # Prepare the text
         text_list = [ref_text + gen_text]
         final_text_list = convert_char_to_pinyin(text_list)
@@ -414,7 +441,9 @@ def infer_batch_process(
             ref_text_len = len(ref_text.encode("utf-8"))
             gen_text_len = len(gen_text.encode("utf-8"))
             duration = ref_audio_len + int(ref_audio_len / ref_text_len * gen_text_len / speed)
-        for j in range(3):
+        
+        j=decimalinicial
+        for _ in range(intentos):
             # inference
             with torch.inference_mode():
                 generated, _ = model_obj.sample(
@@ -442,6 +471,9 @@ def infer_batch_process(
                     generated_waves.append(generated_wave)
                 spectrograms.append(generated_mel_spec[0].cpu().numpy())
                 sf.write(f'{"./ff5tts/temp/"}{i:04d}.{j}.wav', generated_wave,target_sample_rate)
+            j+=1
+        i+=incremental
+        j=decimalinicial
 
     # Combine all generated waves with cross-fading
     if cross_fade_duration <= 0:

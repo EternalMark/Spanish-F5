@@ -74,17 +74,17 @@ def generate_response(messages, model, tokenizer):
     ]
     return tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-def traducir_numero_a_texto(texto):
-    texto_separado = re.sub(r'([A-Za-z])(\d)', r'\1 \2', texto)
-    texto_separado = re.sub(r'(\d)([A-Za-z])', r'\1 \2', texto_separado)
+# def traducir_numero_a_texto(texto):
+#     texto_separado = re.sub(r'([A-Za-z])(\d)', r'\1 \2', texto)
+#     texto_separado = re.sub(r'(\d)([A-Za-z])', r'\1 \2', texto_separado)
     
-    def reemplazar_numero(match):
-        numero = match.group()
-        return num2words(int(numero), lang='es')
+#     def reemplazar_numero(match):
+#         numero = match.group()
+#         return num2words(int(numero), lang='es')
 
-    texto_traducido = re.sub(r'\b\d+\b', reemplazar_numero, texto_separado)
+#     texto_traducido = re.sub(r'\b\d+\b', reemplazar_numero, texto_separado)
 
-    return texto_traducido
+#     return texto_traducido
 
 @gpu_decorator
 def infer(
@@ -99,8 +99,8 @@ def infer(
     if not gen_text.endswith(". "):
         gen_text += ". "
 
-    gen_text = gen_text.lower()
-    gen_text = traducir_numero_a_texto(gen_text)
+    # gen_text = gen_text.lower()
+    # gen_text = traducir_numero_a_texto(gen_text)
 
     final_wave, final_sample_rate, combined_spectrogram = infer_process(
         ref_audio,
@@ -141,7 +141,7 @@ with gr.Blocks() as app_credits:
 
 
 with gr.Blocks() as app_tts:
-    gr.Markdown("# TTS por Lotes POR MARCOS")
+    gr.Markdown("# TTS por Lotes POR MARCOS **********")
     ref_audio_input = gr.Audio(label="Audio de Referencia", type="filepath")
     gen_text_input = gr.Textbox(label="Texto para Generar", lines=10)
     model_choice = gr.Radio(choices=["F5-TTS"], label="Seleccionar Modelo TTS", value="F5-TTS")
