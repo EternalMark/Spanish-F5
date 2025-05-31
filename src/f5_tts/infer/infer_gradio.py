@@ -88,12 +88,12 @@ def generate_response(messages, model, tokenizer):
 
 @gpu_decorator
 def infer(
-    ref_audio_orig, ref_text, gen_text, model, remove_silence, cross_fade_duration=0.15, speed=1, show_info=gr.Info,
+    ref_audio_orig, ref_text, gen_text, model, remove_silence, cross_fade_duration=0.15, speed=1, 
     decimalinicial=0,
     intentos=3,
     incremental=10,
-    inicial=40
-
+    inicial=40,
+    show_info=gr.Info
 ):
     ref_audio, ref_text = preprocess_ref_audio_text(ref_audio_orig, ref_text, show_info=show_info)
 
@@ -166,7 +166,7 @@ with gr.Blocks() as app_tts:
         minimum=1,
         maximum=10,
         value=1,
-        step=10,
+        step=1,
         info="Incremental para el nombre del audio.",
     )
     decimalinicial = gr.Slider(
