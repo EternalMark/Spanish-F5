@@ -228,10 +228,10 @@ with gr.Blocks() as app_tts:
             remove_silence,
             cross_fade_duration_slider,
             speed_slider,
-            int(decimalinicial),
-            int(intentos),
-            int(incremental),
-            int(inicial)
+            decimalinicial,
+            intentos,
+            incremental,
+            inicial
         ],
         outputs=[audio_output, spectrogram_output],
     )
