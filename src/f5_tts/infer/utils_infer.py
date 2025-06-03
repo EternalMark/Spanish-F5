@@ -359,7 +359,8 @@ def infer_process(
     # gen_text_batches = chunk_text(gen_text, max_chars=max_chars)
     gen_text_batches = chunk_text(gen_text, max_chars=80)
     print(f"*********************")
-    with open("./ff5tts/temp/sentences.txt", "w") as f:
+    os.makedirs(f'./ff5tts/temp/', exist_ok=True)
+    with open("./ff5tts/temp/sentences.txt", "w+") as f:
         for i, gen_text in enumerate(gen_text_batches):
             print(f"'{gen_text}")
             f.write(f"'{gen_text}\n")
