@@ -55,6 +55,15 @@ fix_duration = None
 # -----------------------------------------
 
 
+def procesatexto(s):
+	s=s.replace(";",",")
+	s=s.replace("Dr.","doctor")
+	s=s.replace("XIX","19")
+	# r=r.replace("¡","")
+	# r=r.replace("!","")
+	s=traducir_numero_a_texto(s)
+	return s
+
 # chunk text into smaller pieces
 
 
@@ -75,7 +84,8 @@ def chunk_text(text, max_chars=135):
     sentences = re.split(r"(?<=[;:,.!?])\s+|(?<=[；：，。！？])", text)
 
     for sentence in sentences:
-        if len(current_chunk.encode("utf-8")) + len(sentence.encode("utf-8")) <= max_chars:
+        sentence=procesatexto(sentence)
+        if len(current_chunk.encode("utf-8")) + len(sentence.encode("utf-8")) <= max_chars and (len(current_chunk.encode("utf-8")) == 0 or current_chunk[-2]== ","):
             current_chunk += sentence + " " if sentence and len(sentence[-1].encode("utf-8")) == 1 else sentence
         else:
             if current_chunk:
