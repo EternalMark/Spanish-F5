@@ -61,7 +61,7 @@ def procesatexto(s):
 	s=s.replace("XIX","19")
 	# r=r.replace("¡","")
 	# r=r.replace("!","")
-	s=traducir_numero_a_texto(s)
+	s=traducir_numero_a_texto(s).lower()
 	return s
 
 # chunk text into smaller pieces
@@ -395,7 +395,7 @@ def traducir_numero_a_texto(texto):
     
     texto_separado = re.sub(r'([A-Za-z])(\d)', r'\1 \2', texto)
     texto_separado = re.sub(r'(\d)([A-Za-z])', r'\1 \2', texto_separado)
-    texto_separado=texto_separado.lower()
+    # texto_separado=texto_separado.lower()
     def reemplazar_numero(match):
         numero = match.group()
         return num2words(int(numero), lang='es')
