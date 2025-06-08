@@ -81,7 +81,7 @@ def chunk_text(text, max_chars=135):
     chunks = []
     current_chunk = ""
     # Split the text into sentences based on punctuation followed by whitespace
-    sentences = re.split(r"(?<=[;:,.!?])\s+|(?<=[；：，。！？])", text)
+    sentences = re.split(r"(?<=[;:,.!?])\s+|(?<=[；：，。！？])|(?= —)", text)
 
     for sentence in sentences:
         sentence=procesatexto(sentence)
@@ -364,7 +364,6 @@ def infer_process(
         for i, gen_text in enumerate(gen_text_batches):
             print(f"'{gen_text}")
             f.write(f"'{gen_text}\n")
-
     print(f"*********************")
     print("File created successfully")
 
