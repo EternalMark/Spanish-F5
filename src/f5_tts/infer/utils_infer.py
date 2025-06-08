@@ -353,6 +353,7 @@ def infer_process(
         for i, gen_text in enumerate(gen_text_batches):
             print(f"'{gen_text}")
             f.write(f"'{gen_text}\n")
+
     print(f"*********************")
     print("File created successfully")
 
@@ -440,6 +441,8 @@ def infer_batch_process(
     for gen_text in progress.tqdm(gen_text_batches):
         
         gen_text = traducir_numero_a_texto(gen_text)
+        if len(gen_text) <= 20:
+            gen_text=" , , "+gen_text+" , , "
         # Prepare the text
         text_list = [ref_text + gen_text]
         final_text_list = convert_char_to_pinyin(text_list)
@@ -476,7 +479,7 @@ def infer_batch_process(
                 if rms < target_rms:
                     generated_wave = generated_wave * rms / target_rms
 
-                # wav -> numpy
+                # wav -> numpy  
                 generated_wave = generated_wave.squeeze().cpu().numpy()
                 if j==0:
                     generated_waves.append(generated_wave)
