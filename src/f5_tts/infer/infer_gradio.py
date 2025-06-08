@@ -156,7 +156,7 @@ with gr.Blocks() as app_tts:
     inicial = gr.Slider(
         label="inicial",
         minimum=0,
-        maximum=990,
+        maximum=9990,
         value=40,
         step=10,
         info="Nombre inicial.",
