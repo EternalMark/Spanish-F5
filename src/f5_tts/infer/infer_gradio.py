@@ -93,6 +93,8 @@ def infer(
     intentos=3,
     incremental=10,
     inicial=40,
+    genera_slides=True,
+    intentos_fallidos=20,
     show_info=gr.Info
 ):
     ref_audio, ref_text = preprocess_ref_audio_text(ref_audio_orig, ref_text, show_info=show_info)
@@ -120,7 +122,10 @@ def infer(
         decimalinicial=decimalinicial,
         intentos=intentos,
         incremental=incremental,
-        inicial=inicial
+        inicial=inicial,
+        genera_slides=genera_slides,
+        intentos_fallidos=intentos_fallidos
+
     )
 
     # Remove silence
@@ -153,6 +158,19 @@ with gr.Blocks() as app_tts:
     gr.Markdown("# TTS por Lotes POR MARCOS **********")
     ref_audio_input = gr.Audio(label="Audio de Referencia", type="filepath")
     gen_text_input = gr.Textbox(label="Texto para Generar", lines=10)
+    genera_slides = gr.Checkbox(
+            label="Generar slides",
+            info="Si NO está seleccionado NO se guardarán todos los slides",
+            value=True,
+    )
+    intentos_fallidos = gr.Slider(
+        label="Salida de emergencia",
+        minimum=5,
+        maximum=100,
+        value=20,
+        step=5,
+        info="Número máximo de intentos fallidos permitidos, para generar un slide. Util si alguna oración no se puede generar y hay que modificarla",
+    )
     inicial = gr.Slider(
         label="inicial",
         minimum=0,
@@ -231,7 +249,9 @@ with gr.Blocks() as app_tts:
             decimalinicial,
             intentos,
             incremental,
-            inicial
+            inicial,
+            genera_slides,
+            intentos_fallidos
         ],
         outputs=[audio_output, spectrogram_output],
     )

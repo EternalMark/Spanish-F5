@@ -351,7 +351,9 @@ def infer_process(
     decimalinicial=0,
     intentos=3,
     incremental=10,
-    inicial=40
+    inicial=40,
+    genera_slides=True,
+    intentos_fallidos=20
 ):
     # Split the input text into batches
     audio, sr = torchaudio.load(ref_audio)
@@ -387,7 +389,9 @@ def infer_process(
         decimalinicial=decimalinicial,
         intentos=intentos,
         incremental=incremental,
-        inicial=inicial
+        inicial=inicial,
+        genera_slides=genera_slides,
+        intentos_fallidos=intentos_fallidos
     )
 
 
@@ -404,10 +408,18 @@ def traducir_numero_a_texto(texto):
 
     return texto_traducido
 
+def validacionestexto(s):
+	s=s.replace("—","")
+	s=s.replace(",","")
+	s=s.replace(".","")
+	s=s.replace("!","")
+	s=s.replace("¡","")
+	s=s.replace("¿","")
+	s=traducir_numero_a_texto(s).lower().strip()
+	return s
+
 
 # infer batches
-
-
 def infer_batch_process(
     ref_audio,
     ref_text,
@@ -427,7 +439,9 @@ def infer_batch_process(
     decimalinicial=0,
     intentos=3,
     incremental=10,
-    inicial=40
+    inicial=40,
+    genera_slides=True,
+    intentos_fallidos=20
 ):
     audio, sr = ref_audio
     if audio.shape[0] > 1:
@@ -467,7 +481,9 @@ def infer_batch_process(
             duration = ref_audio_len + int(ref_audio_len / ref_text_len * gen_text_len / speed)
         
         j=decimalinicial
-        for _ in range(intentos):
+        contadorSalida=0
+	    # for _ in range(intentos):
+        while True:
             # inference
             with torch.inference_mode():
                 generated, _ = model_obj.sample(
@@ -494,8 +510,38 @@ def infer_batch_process(
                 if j==0:
                     generated_waves.append(generated_wave)
                 spectrograms.append(generated_mel_spec[0].cpu().numpy())
-                sf.write(f'{"./ff5tts/temp/"}{i:04d}.{j}.wav', generated_wave,target_sample_rate)
-            j+=1
+
+                global asr_pipe
+                if asr_pipe is None:
+                    initialize_asr_pipeline(device=device)
+                texto_salida = asr_pipe(
+                    generated_wave,
+                    chunk_length_s=30,
+                    batch_size=128,
+                    generate_kwargs={"task": "transcribe"},
+                    return_timestamps=False,
+                )["text"].strip()
+
+                print("||"+validacionestexto(gen_text))
+                print("||"+validacionestexto(texto_salida))
+
+                if validacionestexto(gen_text)==validacionestexto(texto_salida):
+                    j+=1
+                    if genera_slides==True:
+                        # sf.write(f'{ruta}{i:04d}.{j}.wav', generated_wave,target_sample_rate)
+                        sf.write(f'{"./ff5tts/temp/"}{i:04d}.{j}.wav', generated_wave,target_sample_rate)
+                else:
+                    print("Rehaciendo...")
+                    contadorSalida+=1
+
+                if j==intentos:
+                    break
+            
+            if contadorSalida>=intentos_fallidos:
+                print("SALIDA DE EMERGENCIA")
+                print("**Rehacer:",f"{i:04d}")
+                break
+            # j+=1
         i+=incremental
         j=decimalinicial
 
