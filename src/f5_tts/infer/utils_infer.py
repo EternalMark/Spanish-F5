@@ -404,11 +404,11 @@ def procesatexto(s):
 	s=s.replace("...",", , ")
 	s=s.replace("Dr.","doctor")
 	s=s.replace("XIX","19")
-	r=r.replace(" & "," and ")
-	r=r.replace("meadowlight","meadolaight")
-	r=r.replace("vayne","vein")
-	r=r.replace("swiftfoot","suiftfut")
-	r=r.replace("lyra","lira")
+	s=s.replace(" & "," and ")
+	s=s.replace("meadowlight","meadolaight")
+	s=s.replace("vayne","vein")
+	s=s.replace("swiftfoot","suiftfut")
+	s=s.replace("lyra","lira")
 	# r=r.replace("!","")
 	return s
 
