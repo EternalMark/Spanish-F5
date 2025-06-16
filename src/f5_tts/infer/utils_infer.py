@@ -31,6 +31,9 @@ from f5_tts.model.utils import (
 )
 from num2words import num2words
 
+from concurrent.futures import ThreadPoolExecutor  # o ProcessPoolExecutor
+import time
+from itertools import repeat
 
 _ref_audio_cache = {}
 
@@ -432,6 +435,125 @@ def porcentaje_igualdad(texto1: str, texto2: str) -> float:
     # Lo convertimos a porcentaje
     return round(ratio * 100, 2)
 
+generated_waves = []
+spectrograms = []
+
+def genAudio(
+    gen_text,
+    audio,
+    rms,
+    ref_text,
+    model_obj,
+    vocoder,
+    mel_spec_type="vocos",
+    progress=tqdm,
+    target_rms=0.1,
+    cross_fade_duration=0.15,
+    nfe_step=32,
+    cfg_strength=2.0,
+    sway_sampling_coef=-1,
+    speed=1,
+    fix_duration=None,
+    device=None,
+    decimalinicial=0,
+    intentos=3,
+    incremental=10,
+    inicial=40,
+    genera_slides=True,
+    intentos_fallidos=20,
+    i=100,j=0
+    ):
+    
+    gen_text = procesatexto(gen_text)
+    if len(gen_text) <= 20:
+        gen_text=" , , "+gen_text+" , , "
+    # Prepare the text
+    text_list = [ref_text + gen_text]
+    final_text_list = convert_char_to_pinyin(text_list)
+
+    ref_audio_len = audio.shape[-1] // hop_length
+    if fix_duration is not None:
+        duration = int(fix_duration * target_sample_rate / hop_length)
+    else:
+        # Calculate duration
+        ref_text_len = len(ref_text.encode("utf-8"))
+        gen_text_len = len(gen_text.encode("utf-8"))
+        duration = ref_audio_len + int(ref_audio_len / ref_text_len * gen_text_len / speed)
+    
+    j=decimalinicial
+    
+    waves_temp=[]
+
+    faltantes=intentos
+    for _ in range(intentos):
+        contadorSalida=0
+        for _ in range(intentos_fallidos):
+            # inference
+            with torch.inference_mode():
+                generated, _ = model_obj.sample(
+                    cond=audio,
+                    text=final_text_list,
+                    duration=duration,
+                    steps=nfe_step,
+                    cfg_strength=cfg_strength,
+                    sway_sampling_coef=sway_sampling_coef,
+                )
+
+                generated = generated.to(torch.float32)
+                generated = generated[:, ref_audio_len:, :]
+                generated_mel_spec = generated.permute(0, 2, 1)
+                if mel_spec_type == "vocos":
+                    generated_wave = vocoder.decode(generated_mel_spec)
+                elif mel_spec_type == "bigvgan":
+                    generated_wave = vocoder(generated_mel_spec)
+                if rms < target_rms:
+                    generated_wave = generated_wave * rms / target_rms
+
+                # wav -> numpy  
+                generated_wave = generated_wave.squeeze().cpu().numpy()
+                if j==0:
+                    generated_waves.append(generated_wave)
+                    spectrograms.append(generated_mel_spec[0].cpu().numpy())
+
+                if genera_slides:
+
+                    global asr_pipe
+                    if asr_pipe is None:
+                        initialize_asr_pipeline(device=device)
+                    texto_salida = asr_pipe(
+                        generated_wave,
+                        chunk_length_s=30,
+                        batch_size=128,
+                        generate_kwargs={"task": "transcribe"},
+                        return_timestamps=False,
+                    )["text"].strip()
+
+                    similaridad=porcentaje_igualdad(validacionestexto(gen_text),validacionestexto(texto_salida))
+                    print(j,"|",contadorSalida, "similaridad: ",similaridad,"|",validacionestexto(gen_text),"|",validacionestexto(texto_salida))
+
+                    if similaridad==100.0:
+                        # sf.write(f'{"./ff5tts/temp/"}{i:04d}.{j}.wav', generated_wave,target_sample_rate)
+                        sf.write(f'{"./ff5tts/temp/"}{i:04d}.{(intentos-faltantes):02d}.wav', generated_wave,target_sample_rate)
+                        print("Generado: ",f'{"./ff5tts/temp/"}{i:04d}.{(intentos-faltantes):02d}.wav')
+                        faltantes-=1
+                        break
+                    else:
+                        contadorSalida+=1
+                        waves_temp.append((generated_wave,similaridad))
+                else:
+                    break
+
+        if not genera_slides:
+            break
+
+        j+=1
+
+    if faltantes > 0:
+        waves_temp.sort(key=lambda x: x[1], reverse=True)
+        for ff in range(faltantes):
+            sf.write(f'{"./ff5tts/temp/"}{i:04d}.{(intentos-ff-1):02d}.wav', waves_temp[ff][0],target_sample_rate)
+            print("Sim:",waves_temp[ff][1],"| Generado: ",f'{"./ff5tts/temp/"}{i:04d}.{(intentos-ff-1):02d}.wav')
+
 
 # infer batches
 def infer_batch_process(
@@ -469,106 +591,40 @@ def infer_batch_process(
         audio = resampler(audio)
     audio = audio.to(device)
 
-    generated_waves = []
-    spectrograms = []
+    # generated_waves = []
+    # spectrograms = []
 
     if len(ref_text[-1].encode("utf-8")) == 1:
         ref_text = ref_text + " "
     
     i=inicial
     # intentos_fallidos=3
-    for gen_text in progress.tqdm(gen_text_batches):
-        
-        gen_text = procesatexto(gen_text)
-        if len(gen_text) <= 20:
-            gen_text=" , , "+gen_text+" , , "
-        # Prepare the text
-        text_list = [ref_text + gen_text]
-        final_text_list = convert_char_to_pinyin(text_list)
-
-        ref_audio_len = audio.shape[-1] // hop_length
-        if fix_duration is not None:
-            duration = int(fix_duration * target_sample_rate / hop_length)
-        else:
-            # Calculate duration
-            ref_text_len = len(ref_text.encode("utf-8"))
-            gen_text_len = len(gen_text.encode("utf-8"))
-            duration = ref_audio_len + int(ref_audio_len / ref_text_len * gen_text_len / speed)
-        
-        j=decimalinicial
-        
-        waves_temp=[]
-
-        faltantes=intentos
-        for _ in range(intentos):
-            contadorSalida=0
-            for _ in range(intentos_fallidos):
-                # inference
-                with torch.inference_mode():
-                    generated, _ = model_obj.sample(
-                        cond=audio,
-                        text=final_text_list,
-                        duration=duration,
-                        steps=nfe_step,
-                        cfg_strength=cfg_strength,
-                        sway_sampling_coef=sway_sampling_coef,
-                    )
-
-                    generated = generated.to(torch.float32)
-                    generated = generated[:, ref_audio_len:, :]
-                    generated_mel_spec = generated.permute(0, 2, 1)
-                    if mel_spec_type == "vocos":
-                        generated_wave = vocoder.decode(generated_mel_spec)
-                    elif mel_spec_type == "bigvgan":
-                        generated_wave = vocoder(generated_mel_spec)
-                    if rms < target_rms:
-                        generated_wave = generated_wave * rms / target_rms
-
-                    # wav -> numpy  
-                    generated_wave = generated_wave.squeeze().cpu().numpy()
-                    if j==0:
-                        generated_waves.append(generated_wave)
-                    spectrograms.append(generated_mel_spec[0].cpu().numpy())
-
-                    if genera_slides:
-
-                        global asr_pipe
-                        if asr_pipe is None:
-                            initialize_asr_pipeline(device=device)
-                        texto_salida = asr_pipe(
-                            generated_wave,
-                            chunk_length_s=30,
-                            batch_size=128,
-                            generate_kwargs={"task": "transcribe"},
-                            return_timestamps=False,
-                        )["text"].strip()
-
-                        similaridad=porcentaje_igualdad(validacionestexto(gen_text),validacionestexto(texto_salida))
-                        print(j,"|",contadorSalida, "similaridad: ",similaridad,"|",validacionestexto(gen_text),"|",validacionestexto(texto_salida))
-
-                        if similaridad==100.0:
-                            # sf.write(f'{"./ff5tts/temp/"}{i:04d}.{j}.wav', generated_wave,target_sample_rate)
-                            sf.write(f'{"./ff5tts/temp/"}{i:04d}.{(intentos-faltantes):02d}.wav', generated_wave,target_sample_rate)
-                            print("Generado: ",f'{"./ff5tts/temp/"}{i:04d}.{(intentos-faltantes):02d}.wav')
-                            faltantes-=1
-                            break
-                        else:
-                            contadorSalida+=1
-                            waves_temp.append((generated_wave,similaridad))
-                    else:
-                        break
-
-            if not genera_slides:
-                break
-
-            j+=1
-
-        if faltantes > 0:
-            waves_temp.sort(key=lambda x: x[1], reverse=True)
-            for ff in range(faltantes):
-                sf.write(f'{"./ff5tts/temp/"}{i:04d}.{(intentos-ff-1):02d}.wav', waves_temp[ff][0],target_sample_rate)
-                print("Sim:",waves_temp[ff][1],"| Generado: ",f'{"./ff5tts/temp/"}{i:04d}.{(intentos-ff-1):02d}.wav')
-            
+    # for gen_text in progress.tqdm(gen_text_batches):
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        executor.map(genAudio, progress.tqdm(gen_text_batches),
+                        repeat(audio),
+                        repeat(rms),
+                        repeat(ref_text),
+                        repeat(model_obj),
+                        repeat(vocoder),
+                        repeat(mel_spec_type),
+                        repeat(progress),
+                        repeat(target_rms),
+                        repeat(cross_fade_duration),
+                        repeat(nfe_step),
+                        repeat(cfg_strength),
+                        repeat(sway_sampling_coef),
+                        repeat(speed),
+                        repeat(fix_duration),
+                        repeat(device),
+                        repeat(decimalinicial),
+                        repeat(intentos),
+                        repeat(incremental),
+                        repeat(inicial),
+                        repeat(genera_slides),
+                        repeat(intentos_fallidos),
+                        i,j
+        )  
         i+=incremental
         j=decimalinicial
 

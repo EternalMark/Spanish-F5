@@ -165,10 +165,10 @@ with gr.Blocks() as app_tts:
     )
     intentos_fallidos = gr.Slider(
         label="Salida de emergencia",
-        minimum=5,
-        maximum=50,
-        value=5,
-        step=5,
+        minimum=2,
+        maximum=10,
+        value=2,
+        step=2,
         info="Número máximo de intentos fallidos permitidos, para generar un slide. Util si alguna oración no se puede generar y hay que modificarla",
     )
     inicial = gr.Slider(
