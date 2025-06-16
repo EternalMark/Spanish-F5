@@ -76,7 +76,7 @@ def chunk_text(text, max_chars=135):
 
     for sentence in sentences:
         fake_chunk=current_chunk.replace("...",",")
-        if len(traducir_numero_a_texto(current_chunk.encode("utf-8"))) + len(traducir_numero_a_texto(sentence.encode("utf-8"))) <= max_chars and (len(current_chunk.encode("utf-8")) == 0 or current_chunk[-2]== "," or fake_chunk[-2]== ","):
+        if len(traducir_numero_a_texto(current_chunk).encode("utf-8")) + len(traducir_numero_a_texto(sentence).encode("utf-8")) <= max_chars and (len(current_chunk.encode("utf-8")) == 0 or current_chunk[-2]== "," or fake_chunk[-2]== ","):
             current_chunk += sentence + " " if sentence and len(sentence[-1].encode("utf-8")) == 1 else sentence
         else:
             if current_chunk:
