@@ -601,7 +601,7 @@ def infer_batch_process(
     ilist=range(inicial, inicial+(len(gen_text_batches)*incremental),incremental)
     # intentos_fallidos=3
     # for gen_text in progress.tqdm(gen_text_batches):
-    with ThreadPoolExecutor(max_workers=20) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         executor.map(genAudio, progress.tqdm(gen_text_batches),
                         repeat(audio),
                         repeat(rms),
