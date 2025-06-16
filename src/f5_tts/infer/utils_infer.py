@@ -11,6 +11,7 @@ import tempfile
 from importlib.resources import files
 
 import matplotlib
+from difflib import SequenceMatcher
 
 matplotlib.use("Agg")
 
@@ -54,16 +55,6 @@ fix_duration = None
 
 # -----------------------------------------
 
-
-def procesatexto(s):
-	s=s.replace(";",",")
-	s=s.replace("Dr.","doctor")
-	s=s.replace("XIX","19")
-	# r=r.replace("¡","")
-	# r=r.replace("!","")
-	s=traducir_numero_a_texto(s).lower()
-	return s
-
 # chunk text into smaller pieces
 
 
@@ -84,8 +75,8 @@ def chunk_text(text, max_chars=135):
     sentences = re.split(r"(?<=[;:,.!?])\s+|(?<=[；：，。！？])|(?= —)", text)
 
     for sentence in sentences:
-        sentence=procesatexto(sentence)
-        if len(current_chunk.encode("utf-8")) + len(sentence.encode("utf-8")) <= max_chars and (len(current_chunk.encode("utf-8")) == 0 or current_chunk[-2]== ","):
+        fake_chunk=current_chunk.replace("...",",")
+        if len(traducir_numero_a_texto(current_chunk.encode("utf-8"))) + len(traducir_numero_a_texto(sentence.encode("utf-8"))) <= max_chars and (len(current_chunk.encode("utf-8")) == 0 or current_chunk[-2]== "," or fake_chunk[-2]== ","):
             current_chunk += sentence + " " if sentence and len(sentence[-1].encode("utf-8")) == 1 else sentence
         else:
             if current_chunk:
@@ -357,15 +348,15 @@ def infer_process(
 ):
     # Split the input text into batches
     audio, sr = torchaudio.load(ref_audio)
-    max_chars = int(len(ref_text.encode("utf-8")) / (audio.shape[-1] / sr) * (25 - audio.shape[-1] / sr))
-    # gen_text_batches = chunk_text(gen_text, max_chars=max_chars)
+    # max_chars = int(len(ref_text.encode("utf-8")) / (audio.shape[-1] / sr) * (25 - audio.shape[-1] / sr))
+    
     gen_text_batches = chunk_text(gen_text, max_chars=80)
     print(f"*********************")
     os.makedirs(f'./ff5tts/temp/', exist_ok=True)
     with open("./ff5tts/temp/sentences.txt", "w+") as f:
-        for i, gen_text in enumerate(gen_text_batches):
-            print(f"'{gen_text}")
-            f.write(f"'{gen_text}\n")
+        for gen_text in gen_text_batches:
+            # print(f"'{gen_text}")
+            f.write(f"{gen_text}\n")
     print(f"*********************")
     print("File created successfully")
 
@@ -394,12 +385,11 @@ def infer_process(
         intentos_fallidos=intentos_fallidos
     )
 
-
 def traducir_numero_a_texto(texto):
     
     texto_separado = re.sub(r'([A-Za-z])(\d)', r'\1 \2', texto)
     texto_separado = re.sub(r'(\d)([A-Za-z])', r'\1 \2', texto_separado)
-    # texto_separado=texto_separado.lower()
+    
     def reemplazar_numero(match):
         numero = match.group()
         return num2words(int(numero), lang='es')
@@ -408,6 +398,20 @@ def traducir_numero_a_texto(texto):
 
     return texto_traducido
 
+def procesatexto(s):
+	s=traducir_numero_a_texto(s).lower()
+	s=s.replace(";",",")
+	s=s.replace("...",", , ")
+	s=s.replace("Dr.","doctor")
+	s=s.replace("XIX","19")
+	r=r.replace(" & "," and ")
+	r=r.replace("meadowlight","meadolaight")
+	r=r.replace("vayne","vein")
+	r=r.replace("swiftfoot","suiftfut")
+	r=r.replace("lyra","lira")
+	# r=r.replace("!","")
+	return s
+
 def validacionestexto(s):
 	s=s.replace("—","")
 	s=s.replace(",","")
@@ -415,8 +419,18 @@ def validacionestexto(s):
 	s=s.replace("!","")
 	s=s.replace("¡","")
 	s=s.replace("¿","")
+	s=s.replace('"','')
 	s=traducir_numero_a_texto(s).lower().strip()
 	return s
+
+
+def porcentaje_igualdad(texto1: str, texto2: str) -> float:
+    # Creamos un comparador de secuencias
+    comparador = SequenceMatcher(None, texto1, texto2)
+    # Obtenemos el ratio de similitud (entre 0.0 y 1.0)
+    ratio = comparador.ratio()
+    # Lo convertimos a porcentaje
+    return round(ratio * 100, 2)
 
 
 # infer batches
@@ -462,9 +476,10 @@ def infer_batch_process(
         ref_text = ref_text + " "
     
     i=inicial
+    # intentos_fallidos=3
     for gen_text in progress.tqdm(gen_text_batches):
         
-        gen_text = traducir_numero_a_texto(gen_text)
+        gen_text = procesatexto(gen_text)
         if len(gen_text) <= 20:
             gen_text=" , , "+gen_text+" , , "
         # Prepare the text
@@ -481,67 +496,79 @@ def infer_batch_process(
             duration = ref_audio_len + int(ref_audio_len / ref_text_len * gen_text_len / speed)
         
         j=decimalinicial
-        contadorSalida=0
-	    # for _ in range(intentos):
-        while True:
-            # inference
-            with torch.inference_mode():
-                generated, _ = model_obj.sample(
-                    cond=audio,
-                    text=final_text_list,
-                    duration=duration,
-                    steps=nfe_step,
-                    cfg_strength=cfg_strength,
-                    sway_sampling_coef=sway_sampling_coef,
-                )
+        
+        waves_temp=[]
 
-                generated = generated.to(torch.float32)
-                generated = generated[:, ref_audio_len:, :]
-                generated_mel_spec = generated.permute(0, 2, 1)
-                if mel_spec_type == "vocos":
-                    generated_wave = vocoder.decode(generated_mel_spec)
-                elif mel_spec_type == "bigvgan":
-                    generated_wave = vocoder(generated_mel_spec)
-                if rms < target_rms:
-                    generated_wave = generated_wave * rms / target_rms
+        faltantes=intentos
+        for _ in range(intentos):
+            contadorSalida=0
+            for _ in range(intentos_fallidos):
+                # inference
+                with torch.inference_mode():
+                    generated, _ = model_obj.sample(
+                        cond=audio,
+                        text=final_text_list,
+                        duration=duration,
+                        steps=nfe_step,
+                        cfg_strength=cfg_strength,
+                        sway_sampling_coef=sway_sampling_coef,
+                    )
 
-                # wav -> numpy  
-                generated_wave = generated_wave.squeeze().cpu().numpy()
-                if j==0:
-                    generated_waves.append(generated_wave)
-                spectrograms.append(generated_mel_spec[0].cpu().numpy())
+                    generated = generated.to(torch.float32)
+                    generated = generated[:, ref_audio_len:, :]
+                    generated_mel_spec = generated.permute(0, 2, 1)
+                    if mel_spec_type == "vocos":
+                        generated_wave = vocoder.decode(generated_mel_spec)
+                    elif mel_spec_type == "bigvgan":
+                        generated_wave = vocoder(generated_mel_spec)
+                    if rms < target_rms:
+                        generated_wave = generated_wave * rms / target_rms
 
-                global asr_pipe
-                if asr_pipe is None:
-                    initialize_asr_pipeline(device=device)
-                texto_salida = asr_pipe(
-                    generated_wave,
-                    chunk_length_s=30,
-                    batch_size=128,
-                    generate_kwargs={"task": "transcribe"},
-                    return_timestamps=False,
-                )["text"].strip()
+                    # wav -> numpy  
+                    generated_wave = generated_wave.squeeze().cpu().numpy()
+                    if j==0:
+                        generated_waves.append(generated_wave)
+                    spectrograms.append(generated_mel_spec[0].cpu().numpy())
 
-                print("||"+validacionestexto(gen_text))
-                print("||"+validacionestexto(texto_salida))
+                    if genera_slides:
 
-                if validacionestexto(gen_text)==validacionestexto(texto_salida):
-                    j+=1
-                    if genera_slides==True:
-                        # sf.write(f'{ruta}{i:04d}.{j}.wav', generated_wave,target_sample_rate)
-                        sf.write(f'{"./ff5tts/temp/"}{i:04d}.{j}.wav', generated_wave,target_sample_rate)
-                else:
-                    print("Rehaciendo...")
-                    contadorSalida+=1
+                        global asr_pipe
+                        if asr_pipe is None:
+                            initialize_asr_pipeline(device=device)
+                        texto_salida = asr_pipe(
+                            generated_wave,
+                            chunk_length_s=30,
+                            batch_size=128,
+                            generate_kwargs={"task": "transcribe"},
+                            return_timestamps=False,
+                        )["text"].strip()
 
-                if j==intentos:
-                    break
-            
-            if contadorSalida>=intentos_fallidos:
-                print("SALIDA DE EMERGENCIA")
-                print("**Rehacer:",f"{i:04d}")
+                        similaridad=porcentaje_igualdad(validacionestexto(gen_text),validacionestexto(texto_salida))
+                        print(j,"|",contadorSalida, "similaridad: ",similaridad,"|",validacionestexto(gen_text),"|",validacionestexto(texto_salida))
+
+                        if similaridad==100.0:
+                            # sf.write(f'{"./ff5tts/temp/"}{i:04d}.{j}.wav', generated_wave,target_sample_rate)
+                            sf.write(f'{"./ff5tts/temp/"}{i:04d}.{(intentos-faltantes):02d}.wav', generated_wave,target_sample_rate)
+                            print("Generado: ",f'{"./ff5tts/temp/"}{i:04d}.{(intentos-faltantes):02d}.wav')
+                            faltantes-=1
+                            break
+                        else:
+                            contadorSalida+=1
+                            waves_temp.append((generated_wave,similaridad))
+                    else:
+                        break
+
+            if not genera_slides:
                 break
-            # j+=1
+
+            j+=1
+
+        if faltantes > 0:
+            waves_temp.sort(key=lambda x: x[1], reverse=True)
+            for ff in range(faltantes):
+                sf.write(f'{"./ff5tts/temp/"}{i:04d}.{(intentos-ff-1):02d}.wav', waves_temp[ff][0],target_sample_rate)
+                print("Sim:",waves_temp[ff][1],"| Generado: ",f'{"./ff5tts/temp/"}{i:04d}.{(intentos-ff-1):02d}.wav')
+            
         i+=incremental
         j=decimalinicial
 
