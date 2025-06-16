@@ -480,8 +480,6 @@ def genAudio(
         gen_text_len = len(gen_text.encode("utf-8"))
         duration = ref_audio_len + int(ref_audio_len / ref_text_len * gen_text_len / speed)
     
-    j=decimalinicial
-    
     waves_temp=[]
 
     faltantes=intentos
@@ -598,6 +596,7 @@ def infer_batch_process(
         ref_text = ref_text + " "
     
     i=inicial
+    j=decimalinicial
     # intentos_fallidos=3
     # for gen_text in progress.tqdm(gen_text_batches):
     with ThreadPoolExecutor(max_workers=20) as executor:
@@ -623,7 +622,8 @@ def infer_batch_process(
                         repeat(inicial),
                         repeat(genera_slides),
                         repeat(intentos_fallidos),
-                        i,j
+                        repeat(i),
+                        repeat(j)
         )  
         i+=incremental
         j=decimalinicial
