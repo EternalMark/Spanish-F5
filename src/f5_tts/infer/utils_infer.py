@@ -461,7 +461,7 @@ def genAudio(
     inicial=40,
     genera_slides=True,
     intentos_fallidos=20,
-    i=100,j=0
+    i=100
     ):
     
     gen_text = procesatexto(gen_text)
@@ -480,6 +480,7 @@ def genAudio(
         gen_text_len = len(gen_text.encode("utf-8"))
         duration = ref_audio_len + int(ref_audio_len / ref_text_len * gen_text_len / speed)
     
+    j=decimalinicial
     waves_temp=[]
 
     faltantes=intentos
@@ -595,8 +596,9 @@ def infer_batch_process(
     if len(ref_text[-1].encode("utf-8")) == 1:
         ref_text = ref_text + " "
     
-    i=inicial
-    j=decimalinicial
+    # i=inicial
+    # ilist=range(1, len(datos) + 1)
+    ilist=range(inicial, inicial+(len(gen_text_batches)*incremental),incremental)
     # intentos_fallidos=3
     # for gen_text in progress.tqdm(gen_text_batches):
     with ThreadPoolExecutor(max_workers=20) as executor:
@@ -622,11 +624,11 @@ def infer_batch_process(
                         repeat(inicial),
                         repeat(genera_slides),
                         repeat(intentos_fallidos),
-                        repeat(i),
-                        repeat(j)
+                        ilist
+                        # repeat(j)
         )  
-        i+=incremental
-        j=decimalinicial
+        # i+=incremental
+        # j=decimalinicial
 
     # Combine all generated waves with cross-fading
     if cross_fade_duration <= 0:
